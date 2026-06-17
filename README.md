@@ -1,14 +1,40 @@
-# Deploy DagsHub MLOps Platform on OpenShift AI
+# Unifying the AI Development Lifecycle with DagsHub and OpenShift AI
 
-Set up DagsHub on RHOAI in minutes to enable AI teams to track experiments, manage datasets, and collaborate on AI projects.
+Deploy DagsHub® on Red Hat OpenShift® with Red Hat OpenShift AI® so teams can track experiments, manage datasets, and collaborate on AI projects.
+
+> [!IMPORTANT]  
+> A license and service account from DagsHub are required for this quickstart. See the [prerequisites](#prerequisites) section below for details.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Requirements](#requirements)
+  - [Minimum Hardware Requirements](#minimum-hardware-requirements)
+  - [Software Requirements](#software-requirements)
+- [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Installing the quickstart](#installing-the-quickstart)
+  - [Removing the quickstart](#removing-the-quickstart)
+- [LLM Tutorial Workbench](#llm-tutorial-workbench)
+- [Management](#management)
+  - [Check Status](#check-status)
+  - [Available Commands](#available-commands)
+- [Troubleshooting](#troubleshooting)
+- [References](#references)
+- [Tags](#tags)
 
 ## Overview
 
-AI teams need a centralized platform to track experiments, manage dataset versions, and collaborate on model development. While cloud-based MLOps solutions exist, many organizations require their AI infrastructure to remain within their private environment to meet security, compliance, and data privacy requirements. 
+AI teams need a centralized platform to track experiments, manage dataset versions, and collaborate on model development. While cloud-based MLOps solutions exist, many organizations require their AI infrastructure to remain within their private environment to meet security, compliance, and data privacy requirements. This AI quickstart helps teams deploy DagsHub MLOps platform on Red Hat OpenShift AI to track experiments, manage datasets, and collaborate on AI projects.
 
 DagsHub provides a complete MLOps platform with experiment tracking, model registry, and data versioning capabilities that can be deployed entirely within your organization's infrastructure.
 
-Deploying DagsHub on Red Hat OpenShift AI enables teams to maintain full control over their AI workflows and data while benefiting from enterprise-grade security and scalability. This repository simplifies the deployment process with a single Makefile that automates the installation of DagsHub on your RHOAI cluster.
+Deploying DagsHub with OpenShift AI enables teams to maintain full control over their AI workflows and data while benefiting from enterprise-grade security and scalability. This repository simplifies the deployment process with a single Makefile that automates the installation of DagsHub on your OpenShift AI cluster.
+
+## Architecture
+
+![Architecture diagram showing an the integrated stack including OpenShift, OpenShift AI and DagsHub](docs/images/dagshub-openshift-arch.png)
 
 ## Requirements
 
@@ -25,7 +51,8 @@ Your OpenShift cluster must have sufficient resources to run DagsHub and its dep
 
 ### Software Requirements
 
-- **Red Hat OpenShift AI (RHOAI)** or **OpenShift Container Platform**: Version 4.10 or later
+- **Red Hat OpenShift**: Version 4.20 or later
+- **Red Hat OpenShift AI**: Version 3.4 or later
 - **Command-line tools** on your local machine:
   - `oc` CLI (OpenShift command-line tool)
   - `helm` CLI - Version 3.11 or later
@@ -42,20 +69,22 @@ Your OpenShift cluster must have sufficient resources to run DagsHub and its dep
 
 ## Installation
 
-Before deploying DagsHub on your RHOAI cluster, you need to obtain a license and service account from DagsHub:
+### Prerequisites
+
+Before deploying DagsHub on your OpenShift cluster, you need to obtain a license and service account from DagsHub:
 
 1. **Visit DagsHub.com** and contact their team to request an enterprise license and GCP service account credentials
 2. **Download the service account JSON file** provided by DagsHub (e.g., `service-account.json`)
 3. **Ensure you have access to your OpenShift cluster** with the required tools installed
 
-### Deployment Steps
+### Installing the quickstart
 
 1. **Log in to your OpenShift cluster** and verify admin access:
    ```bash
    # Log in to your OpenShift cluster
    oc login https://your-openshift-cluster-url:6443
 
-   # Verify you have cluster-admin privileges
+   # Verify you have admin privileges
    oc auth can-i create project
    ```
 
@@ -95,6 +124,20 @@ Before deploying DagsHub on your RHOAI cluster, you need to obtain a license and
 6. **Access DagsHub** at the URL you specified (e.g., `https://dagshub.yourcompany.com`)
 
 7. **Enter your license key** on first access to complete the initial setup
+
+### Removing the quickstart
+
+To remove DagsHub from your OpenShift cluster:
+
+```bash
+make uninstall-dagshub NAMESPACE=dagshub
+```
+
+This command will:
+1. Uninstall the DagsHub Helm release
+2. Prompt you to delete the container registry secrets (optional)
+3. Prompt you to delete the namespace (optional)
+
 
 ## LLM Tutorial Workbench
 
@@ -136,20 +179,7 @@ View logs from the main DagsHub pod:
 make logs NAMESPACE=dagshub
 ```
 
-### Remove DagsHub
-
-To remove DagsHub from your RHOAI cluster:
-
-```bash
-make uninstall-dagshub NAMESPACE=dagshub
-```
-
-This command will:
-1. Uninstall the DagsHub Helm release
-2. Prompt you to delete the container registry secrets (optional)
-3. Prompt you to delete the namespace (optional)
-
-## Available Commands
+### Available Commands
 
 The Makefile provides the following commands:
 
@@ -191,6 +221,14 @@ oc get events -n <namespace> --sort-by='.lastTimestamp'
 - Check that the route was created: `oc get routes -n <namespace>`
 - Verify DNS resolution for your custom domain
 
+## References
+- [DagsHub documentation](#https://dagshub.com/docs/)
+- [Red Hat OpenShift AI documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed)
+- [Red Hat OpenShift documentation](https://docs.redhat.com/en/documentation/openshift_container_platform)
+
 ## Tags
 
-MLOps, Experiment Tracking, Model Registry, Data Versioning, DagsHub, Red Hat OpenShift AI, AI Platform, Private Cloud, Enterprise AI, Model Management, Dataset Management, AI Development Collaboration, MLflow
+* **Industry:** Cross-industry
+* **Product:** Red Hat OpenShift AI
+* **Use Case:** Experiment tracking, managing datasets, and collaborating on AI projects 
+* **Partner**: DagsHub
