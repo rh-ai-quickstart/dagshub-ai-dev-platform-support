@@ -1,0 +1,65 @@
+{{- if .Values.workspaceProxy.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.workspaceProxy.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: dagshub
+    component: {{ .Values.workspaceProxy.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dagshub
+      component: {{ .Values.workspaceProxy.name }}
+  template:
+    metadata:
+      labels:
+        app: dagshub
+        component: {{ .Values.workspaceProxy.name }}
+    spec:
+      containers:
+      - name: nginx
+        image: {{ .Values.workspaceProxy.image }}
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          sed "s|\${MLFLOW_TOKEN}|$MLFLOW_TOKEN|g" < /etc/nginx/templates/nginx.conf.template > /tmp/nginx.conf
+          exec openresty -c /tmp/nginx.conf -g 'daemon off;'
+        env:
+        - name: MLFLOW_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.mlflow.tokenSecret.name }}
+              key: token
+        ports:
+        - containerPort: {{ .Values.workspaceProxy.port }}
+          protocol: TCP
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/templates/nginx.conf.template
+          subPath: nginx.conf.template
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 32Mi
+          limits:
+            cpu: 200m
+            memory: 64Mi
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.workspaceProxy.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.workspaceProxy.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: {{ .Values.workspaceProxy.name }}-config
+{{- end }}

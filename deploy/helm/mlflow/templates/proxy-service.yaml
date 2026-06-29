@@ -1,0 +1,19 @@
+{{- if .Values.workspaceProxy.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.workspaceProxy.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: dagshub
+    component: {{ .Values.workspaceProxy.name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.workspaceProxy.port }}
+    targetPort: {{ .Values.workspaceProxy.port }}
+    protocol: TCP
+  selector:
+    app: dagshub
+    component: {{ .Values.workspaceProxy.name }}
+{{- end }}

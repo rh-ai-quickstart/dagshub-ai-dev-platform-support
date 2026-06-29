@@ -1,0 +1,12 @@
+apiVersion: v2
+name: dagshub-mlflow
+description: ServiceAccount and RBAC for DagsHub to access the RHOAI built-in MLflow instance
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - dagshub
+  - mlflow
+  - openshift-ai
+  - machine-learning
+  - experiment-tracking

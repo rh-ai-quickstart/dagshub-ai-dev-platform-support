@@ -16,6 +16,7 @@ Deploy DagsHub® on Red Hat OpenShift® with Red Hat OpenShift AI® so teams can
   - [Prerequisites](#prerequisites)
   - [Installing the quickstart](#installing-the-quickstart)
   - [Removing the quickstart](#removing-the-quickstart)
+- [MLflow Workspace Proxy](#mlflow-workspace-proxy)
 - [LLM Tutorial Workbench](#llm-tutorial-workbench)
 - [Management](#management)
   - [Check Status](#check-status)
@@ -138,6 +139,25 @@ This command will:
 2. Prompt you to delete the container registry secrets (optional)
 3. Prompt you to delete the namespace (optional)
 
+
+## MLflow Workspace Proxy
+
+Red Hat OpenShift AI (RHOAI) 3.4+ ships a built-in MLflow instance that is shared across the cluster. To isolate experiments per namespace, RHOAI requires every API request to carry an `X-MLFLOW-WORKSPACE` header identifying the caller's workspace. DagsHub's MLflow client does not add this header natively, so requests to the built-in MLflow endpoint would be rejected.
+
+The MLflow workspace proxy solves this by sitting between DagsHub and the RHOAI MLflow service. It is a lightweight Nginx (OpenResty) sidecar deployed in the DagsHub namespace that:
+
+1. **Injects the workspace header** every proxied request gets `X-MLFLOW-WORKSPACE` set to the DagsHub namespace, so experiments are scoped correctly.
+2. **Handles authentication** the proxy attaches a bearer token from a dedicated ServiceAccount that has `mlflow-edit`, `mlflow-view`, and `mlflow-integration` RBAC roles.
+3. **Strips unsupported fields** RHOAI rejects `artifact_location` on experiment creation when workspaces are enabled, so the proxy removes it from those requests.
+
+DagsHub is then configured to use `http://mlflow-workspace-proxy.<namespace>.svc:8080` as its MLflow tracking URI instead of calling RHOAI directly.
+
+The proxy is deployed automatically as part of `make install-dagshub`. To check its status or remove it independently:
+
+```bash
+make mlflow-status NAMESPACE=dagshub
+make uninstall-mlflow NAMESPACE=dagshub
+```
 
 ## LLM Tutorial Workbench
 

@@ -30,15 +30,15 @@ The tutorial covers essential LLM development concepts including Retrieval-Augme
 
 ### Minimum hardware requirements
 
-- 3 vCPU cores allocated to the workbench
-- 24 GB RAM allocated to the workbench  
+- 2 vCPU cores allocated to the workbench
+- 4 GB RAM allocated to the workbench  
 - 20 GB persistent storage for workspace data
 - GPU access recommended for model fine-tuning exercises
 
 ### Minimum software requirements
 
 - Red Hat OpenShift 4.12+
-- Red Hat OpenShift AI 2.8+ (tested with OpenShift AI 2.22)
+- Red Hat OpenShift AI 3.4+
 - Helm 3.8+
 - OpenShift CLI (`oc`) 4.12+
 
@@ -58,7 +58,7 @@ The tutorial covers essential LLM development concepts including Retrieval-Augme
 
 3. Monitor the deployment progress:
    ```bash
-   oc get jobs -n <namespace> -w
+   oc get pods -n <namespace> -w
    ```
 
 4. Access the workbench:
@@ -68,10 +68,9 @@ The tutorial covers essential LLM development concepts including Retrieval-Augme
    - Click on the "dagshub-llm-tutorial-notebook" workbench
    - Open `hello_world_llm.ipynb` to start the tutorial
 
-5. Verify the setup:
+5. Verify the setup (check the workspace-setup initContainer logs):
    ```bash
-   oc logs job/dagshub-llm-tutorial-git-clone -n <namespace>
-   oc logs job.batch/dagshub-llm-tutorial-notebook -n <namespace> -c workspace-setup
+   oc logs -n <namespace> -l app=dagshub-llm-tutorial-notebook -c workspace-setup
    ```
 
 6. Check workbench status:

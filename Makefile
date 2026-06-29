@@ -1,17 +1,26 @@
 # DagsHub Installation Makefile for OpenShift
+# Requires: RHOAI v3.4+ with MLflow built-in
 # Usage: make install-dagshub NAMESPACE=dagshub SERVICE_ACCOUNT=service-account.json [URL=https://my-dagshub.com]
 
-.PHONY: help install-dagshub create-namespaces create-secrets check-service-account check-url authenticate-helm deploy-dagshub fix-nginx-config expose-route uninstall-dagshub delete-secrets clean status logs restart-main-pod deploy-workbench uninstall-workbench workbench-status
+.PHONY: help install-dagshub create-namespaces create-secrets check-service-account check-url authenticate-helm deploy-mlflow deploy-dagshub init-storage expose-route uninstall-dagshub delete-secrets clean status logs restart-main-pod deploy-workbench uninstall-workbench workbench-status mlflow-status uninstall-mlflow
 
 # Default values
 NAMESPACE ?= dagshub
 LABEL_STUDIO_NAMESPACE ?= label-studio
 SERVICE_ACCOUNT ?= service-account.json
 URL ?= http://localhost:3000
-CHART_VERSION ?=
+CHART_VERSION ?= 1.26.7
 RELEASE_NAME ?= dagshub
 OCI_REGISTRY ?= oci://us-docker.pkg.dev/dagshub-containers/dagshub-charts/dagshub
 FS_GROUP ?= 0
+
+# MLflow integration variables
+MLFLOW_RELEASE_NAME ?= dagshub-mlflow
+MLFLOW_CHART_PATH ?= deploy/helm/mlflow
+MLFLOW_TOKEN_SECRET_NAME ?= dagshub-mlflow-token
+MLFLOW_PROXY_NAME ?= mlflow-workspace-proxy
+MLFLOW_PROXY_PORT ?= 8080
+MLFLOW_PROXY_URL ?= http://$(MLFLOW_PROXY_NAME).$(NAMESPACE).svc:$(MLFLOW_PROXY_PORT)
 
 # Workbench specific variables
 WORKBENCH_NAME ?= dagshub-llm-tutorial
@@ -37,6 +46,7 @@ NC = \033[0m # No Color
 
 help:
 	@echo -e "$(GREEN)DagsHub OpenShift Installation Makefile$(NC)"
+	@echo -e "$(YELLOW)Requires: RHOAI v3.4+ with MLflow built-in$(NC)"
 	@echo ""
 	@echo "Usage:"
 	@echo "  make install-dagshub [NAMESPACE=<namespace>] [SERVICE_ACCOUNT=<path>] [URL=<url>]"
@@ -47,9 +57,10 @@ help:
 	@echo "  URL                       - Public URL for DagsHub (default: http://localhost:3000)"
 	@echo "                              For production, use HTTPS URL ending with .com"
 	@echo "  LABEL_STUDIO_NAMESPACE    - Label Studio namespace (default: label-studio)"
-	@echo "  CHART_VERSION             - Helm chart version (default: latest if not set)"
+	@echo "  CHART_VERSION             - Helm chart version (default: 1.26.7)"
 	@echo "  RELEASE_NAME              - Helm release name (default: dagshub)"
 	@echo "  FS_GROUP                  - Pod fsGroup for volume permissions (default: 0)"
+	@echo "  MLFLOW_PROXY_URL          - MLflow workspace proxy URL (default: http://mlflow-workspace-proxy.<NAMESPACE>.svc:8080)"
 	@echo ""
 	@echo "Examples:"
 	@echo ""
@@ -72,6 +83,14 @@ help:
 	@echo ""
 	@echo "  # Uninstall workbench"
 	@echo "  make uninstall-workbench NAMESPACE=<NAMESPACE>"
+	@echo ""
+	@echo "MLflow Commands:"
+	@echo ""
+	@echo "  # Check MLflow status"
+	@echo "  make mlflow-status NAMESPACE=<NAMESPACE>"
+	@echo ""
+	@echo "  # Uninstall MLflow SA/RBAC integration"
+	@echo "  make uninstall-mlflow NAMESPACE=<NAMESPACE>"
 	@echo ""
 
 check-service-account:
@@ -149,16 +168,55 @@ create-secrets: check-service-account
 		--dry-run=client -o yaml | oc apply -f -
 	@echo -e "$(GREEN)✓ OCI registry secrets created in both namespaces$(NC)"
 
+deploy-mlflow:
+	@echo -e "$(YELLOW)Setting up MLflow integration...$(NC)"
+	@if ! oc get mlflow mlflow &>/dev/null; then \
+		echo -e "$(RED)Error: MLflow CR 'mlflow' not found on the cluster$(NC)"; \
+		echo -e "$(RED)RHOAI v3.4+ with MLflow is required. Please install it first.$(NC)"; \
+		exit 1; \
+	fi
+	@if ! oc wait --for=condition=Available mlflow/mlflow --timeout=0 2>/dev/null; then \
+		echo -e "$(RED)Error: MLflow instance is not yet available$(NC)"; \
+		echo -e "$(YELLOW)Wait for it: oc wait --for=condition=Available mlflow/mlflow --timeout=120s$(NC)"; \
+		exit 1; \
+	fi
+	@echo -e "$(GREEN)✓ MLflow is available on the cluster$(NC)"
+	@echo -e "$(YELLOW)Creating service CA ConfigMap for MLflow TLS...$(NC)"
+	@oc create configmap mlflow-service-ca \
+		-n $(NAMESPACE) \
+		--dry-run=client -o yaml | \
+		oc apply -f -
+	@oc annotate configmap mlflow-service-ca \
+		-n $(NAMESPACE) \
+		service.beta.openshift.io/inject-cabundle=true \
+		--overwrite
+	@echo -e "$(GREEN)✓ Service CA ConfigMap created$(NC)"
+	@echo -e "$(YELLOW)Deploying MLflow SA/RBAC and workspace proxy...$(NC)"
+	@MLFLOW_UI_URL=$$(oc get mlflow mlflow -o jsonpath='{.status.url}' 2>/dev/null); \
+	helm upgrade --install $(MLFLOW_RELEASE_NAME) $(MLFLOW_CHART_PATH) \
+		--namespace $(NAMESPACE) \
+		$$([ -n "$$MLFLOW_UI_URL" ] && echo "--set workspaceProxy.mlflowUiUrl=$$MLFLOW_UI_URL") \
+		--wait \
+		--timeout 5m
+	@echo -e "$(GREEN)✓ MLflow SA/RBAC and workspace proxy deployed$(NC)"
+	@echo -e "$(YELLOW)Waiting for SA token to be populated...$(NC)"
+	@TOKEN=""; \
+	for i in 1 2 3 4 5; do \
+		TOKEN=$$(oc get secret $(MLFLOW_TOKEN_SECRET_NAME) -n $(NAMESPACE) -o jsonpath='{.data.token}' 2>/dev/null); \
+		if [ -n "$$TOKEN" ]; then break; fi; \
+		sleep 2; \
+	done; \
+	if [ -n "$$TOKEN" ]; then \
+		echo -e "$(GREEN)✓ SA token is ready$(NC)"; \
+	else \
+		echo -e "$(RED)Warning: SA token not yet populated$(NC)"; \
+	fi
+
 deploy-dagshub: check-url authenticate-helm
 	@echo -e "$(YELLOW)Deploying DagsHub...$(NC)"
 	@echo -e "$(YELLOW)Using URL: $(URL)$(NC)"
-	@if [ -n "$(CHART_VERSION)" ]; then \
-		echo -e "$(YELLOW)Using chart version: $(CHART_VERSION)$(NC)"; \
-	else \
-		echo -e "$(YELLOW)Using latest chart version$(NC)"; \
-	fi
-
-
+	@echo -e "$(YELLOW)Using chart version: $(CHART_VERSION)$(NC)"
+	@echo -e "$(YELLOW)DagsHub will connect to MLflow via workspace proxy: $(MLFLOW_PROXY_URL)$(NC)"
 	@helm upgrade --install $(RELEASE_NAME) $(OCI_REGISTRY) \
 		$(VERSION_FLAG) \
 		--namespace $(NAMESPACE) \
@@ -178,9 +236,31 @@ deploy-dagshub: check-url authenticate-helm
 		--set seaweedfs.master.podSecurityContext.enabled=false \
 		--set seaweedfs.volume.podSecurityContext.enabled=false \
 		--set seaweedfs.filer.podSecurityContext.enabled=false \
+		--set mlflow.external.enabled=true \
+		--set mlflow.external.url=$(MLFLOW_PROXY_URL) \
 		--timeout 10m \
 		--wait
 	@echo -e "$(GREEN)✓ DagsHub deployed successfully$(NC)"
+
+init-storage:
+	@echo -e "$(YELLOW)Initializing SeaweedFS storage bucket...$(NC)"
+	@echo -e "$(YELLOW)Waiting for SeaweedFS filer to be ready...$(NC)"
+	@oc wait --for=condition=Ready pod/$(RELEASE_NAME)-seaweedfs-filer-0 -n $(NAMESPACE) --timeout=120s
+	@EXISTING=$$(echo 's3.bucket.list' | oc exec -i -n $(NAMESPACE) $(RELEASE_NAME)-seaweedfs-filer-0 -- \
+		weed shell -master $(RELEASE_NAME)-seaweedfs-master-0.$(RELEASE_NAME)-seaweedfs-master:9333 -filer localhost:8888 2>&1 | grep 'dagshub-storage' || true); \
+	if [ -n "$$EXISTING" ]; then \
+		echo -e "$(GREEN)✓ Bucket 'dagshub-storage' already exists$(NC)"; \
+	else \
+		echo 's3.bucket.create -name dagshub-storage' | oc exec -i -n $(NAMESPACE) $(RELEASE_NAME)-seaweedfs-filer-0 -- \
+			weed shell -master $(RELEASE_NAME)-seaweedfs-master-0.$(RELEASE_NAME)-seaweedfs-master:9333 -filer localhost:8888 2>&1; \
+		echo -e "$(GREEN)✓ Bucket 'dagshub-storage' created$(NC)"; \
+	fi
+	@echo -e "$(YELLOW)Restarting DagsHub pods to initialize S3 proxy...$(NC)"
+	@oc rollout restart deployment $(RELEASE_NAME)-stateless-server -n $(NAMESPACE)
+	@oc delete pod $(RELEASE_NAME)-0 -n $(NAMESPACE) --wait=false
+	@oc rollout status deployment $(RELEASE_NAME)-stateless-server -n $(NAMESPACE) --timeout=120s
+	@oc wait --for=condition=Ready pod/$(RELEASE_NAME)-0 -n $(NAMESPACE) --timeout=300s
+	@echo -e "$(GREEN)✓ Storage initialized and DagsHub pods restarted$(NC)"
 
 expose-route: check-url
 	@if [ "$(URL)" = "http://localhost:3000" ]; then \
@@ -201,7 +281,7 @@ expose-route: check-url
 		fi; \
 	fi
 
-install-dagshub: check-service-account create-namespaces create-secrets deploy-dagshub expose-route
+install-dagshub: check-service-account create-namespaces create-secrets deploy-mlflow deploy-dagshub init-storage expose-route
 	@echo ""
 	@echo -e "$(GREEN)========================================$(NC)"
 	@echo -e "$(GREEN)DagsHub Installation Complete!$(NC)"
@@ -250,6 +330,17 @@ uninstall-dagshub:
 	@echo -e "$(RED)Uninstalling DagsHub from namespace: $(NAMESPACE)$(NC)"
 	@helm uninstall $(RELEASE_NAME) -n $(NAMESPACE) || true
 	@echo -e "$(YELLOW)Helm release uninstalled$(NC)"
+	@oc delete route $(NGINX_SERVICE) -n $(NAMESPACE) --ignore-not-found=true
+	@echo -e "$(YELLOW)Route deleted$(NC)"
+	@$(MAKE) uninstall-mlflow NAMESPACE=$(NAMESPACE)
+	@echo ""
+	@read -p "Do you want to delete all PVCs in namespace '$(NAMESPACE)'? [y/N]: " confirm; \
+	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+		oc delete pvc --all -n $(NAMESPACE) --ignore-not-found=true; \
+		echo -e "$(YELLOW)All PVCs deleted from $(NAMESPACE)$(NC)"; \
+	else \
+		echo -e "$(YELLOW)PVCs preserved. Run 'oc delete pvc --all -n $(NAMESPACE)' to delete them later$(NC)"; \
+	fi
 	@echo ""
 	@read -p "Do you want to delete the secrets? [y/N]: " confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
@@ -294,13 +385,9 @@ deploy-workbench:
 	@echo -e "$(GREEN)Deploying DagsHub LLM Tutorial Workbench$(NC)"
 	@echo -e "$(GREEN)========================================$(NC)"
 	@echo ""
-	@echo -e "$(YELLOW)Checking if namespace exists...$(NC)"
-	@if ! oc get namespace $(NAMESPACE) &>/dev/null; then \
-		echo -e "$(RED)Error: Namespace '$(NAMESPACE)' does not exist$(NC)"; \
-		echo -e "$(RED)Please deploy DagsHub first using 'make install-dagshub' or ensure the namespace exists$(NC)"; \
-		exit 1; \
-	fi
-	@echo -e "$(GREEN)✓ Namespace exists: $(NAMESPACE)$(NC)"
+	@echo -e "$(YELLOW)Ensuring namespaces exist...$(NC)"
+	@oc create namespace $(NAMESPACE) --dry-run=client -o yaml | oc apply -f -
+	@echo -e "$(GREEN)✓ Namespace ready: $(NAMESPACE)$(NC)"
 	@echo ""
 	@echo -e "$(YELLOW)Deploying workbench with Helm...$(NC)"
 	@helm upgrade --install $(WORKBENCH_NAME) $(WORKBENCH_CHART_PATH) \
@@ -354,3 +441,48 @@ uninstall-workbench:
 		echo -e "$(YELLOW)PVC preserved (you can delete it later with: oc delete pvc $(WORKBENCH_NAME)-notebook-pvc -n $(NAMESPACE))$(NC)"; \
 	fi
 	@echo -e "$(GREEN)Workbench uninstall complete$(NC)"
+
+# MLflow status and cleanup targets
+mlflow-status:
+	@echo -e "$(YELLOW)MLflow Status$(NC)"
+	@echo ""
+	@echo "MLflow Instance (cluster-wide):"
+	@oc get mlflows mlflow 2>/dev/null || echo "  No MLflow instance found"
+	@echo ""
+	@echo "MLflow URLs:"
+	@INTERNAL=$$(oc get mlflow mlflow -o jsonpath='{.status.address.url}' 2>/dev/null); \
+	EXTERNAL=$$(oc get mlflow mlflow -o jsonpath='{.status.url}' 2>/dev/null); \
+	if [ -n "$$INTERNAL" ]; then \
+		echo -e "  $(GREEN)Internal: $$INTERNAL$(NC)"; \
+	else \
+		echo -e "  $(YELLOW)Internal: not available$(NC)"; \
+	fi; \
+	if [ -n "$$EXTERNAL" ]; then \
+		echo -e "  $(GREEN)External: $$EXTERNAL$(NC)"; \
+	else \
+		echo -e "  $(YELLOW)External: not configured$(NC)"; \
+	fi
+	@echo ""
+	@echo "DagsHub Integration (namespace: $(NAMESPACE)):"
+	@echo "  Helm Release:"
+	@helm list -n $(NAMESPACE) 2>/dev/null | grep $(MLFLOW_RELEASE_NAME) || echo "    No MLflow release found"
+	@echo "  ServiceAccount:"
+	@oc get sa dagshub-mlflow-sa -n $(NAMESPACE) 2>/dev/null || echo "    No MLflow SA found"
+	@echo "  Token Secret:"
+	@if oc get secret $(MLFLOW_TOKEN_SECRET_NAME) -n $(NAMESPACE) -o jsonpath='{.data.token}' 2>/dev/null | grep -q .; then \
+		echo -e "    $(GREEN)$(MLFLOW_TOKEN_SECRET_NAME): token populated$(NC)"; \
+	else \
+		echo -e "    $(YELLOW)$(MLFLOW_TOKEN_SECRET_NAME): not found or empty$(NC)"; \
+	fi
+	@echo "  ClusterRoleBindings:"
+	@oc get clusterrolebinding dagshub-mlflow-edit-$(NAMESPACE) dagshub-mlflow-view-$(NAMESPACE) dagshub-mlflow-integration-$(NAMESPACE) 2>/dev/null || echo "    No ClusterRoleBindings found"
+
+uninstall-mlflow:
+	@echo -e "$(RED)Uninstalling MLflow integration$(NC)"
+	@helm uninstall $(MLFLOW_RELEASE_NAME) -n $(NAMESPACE) 2>/dev/null || true
+	@oc delete clusterrolebinding dagshub-mlflow-edit-$(NAMESPACE) dagshub-mlflow-view-$(NAMESPACE) dagshub-mlflow-integration-$(NAMESPACE) --ignore-not-found=true 2>/dev/null || true
+	@oc delete configmap mlflow-service-ca -n $(NAMESPACE) --ignore-not-found=true 2>/dev/null || true
+	@echo -e "$(GREEN)✓ MLflow Helm release and RBAC removed from namespace $(NAMESPACE)$(NC)"
+	@echo ""
+	@echo -e "$(YELLOW)NOTE: The cluster-wide MLflow instance was not removed.$(NC)"
+	@echo -e "$(YELLOW)To remove it: oc delete mlflow mlflow$(NC)"

@@ -56,3 +56,7 @@ venv.bak/
 *.sqlite
 deploy/helm/workbench/hello_world_llm_old.ipynb
 docs
+
+# claude
+.claude
+service-account.json
