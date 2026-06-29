@@ -1,4 +1,4 @@
-# Unifying the AI Development Lifecycle with DagsHub and OpenShift AI
+# Unify the AI development lifecycle with DagsHub and OpenShift AI
 
 Deploy DagsHub® on Red Hat OpenShift® with Red Hat OpenShift AI® so teams can track experiments, manage datasets, and collaborate on AI projects.
 
