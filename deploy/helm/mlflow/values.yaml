@@ -1,0 +1,20 @@
+mlflow:
+  # ServiceAccount and RBAC for DagsHub to access MLflow
+  serviceAccount:
+    name: dagshub-mlflow-sa
+
+  tokenSecret:
+    name: dagshub-mlflow-token
+
+# Nginx reverse proxy that injects X-MLFLOW-WORKSPACE header for RHOAI 3.4+
+workspaceProxy:
+  enabled: true
+  name: mlflow-workspace-proxy
+  port: 8080
+  image: openresty/openresty:1.27.1.1-alpine
+  # Upstream RHOAI MLflow URL (auto-detected in Makefile, override here if needed)
+  mlflowUrl: "https://mlflow.redhat-ods-applications.svc:8443"
+  # Workspace name (defaults to Release.Namespace if empty)
+  workspace: ""
+  # External MLflow UI URL for redirect (used when clicking "Go to MLflow UI" in DagsHub)
+  mlflowUiUrl: ""

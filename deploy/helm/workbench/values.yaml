@@ -9,16 +9,21 @@ workbench:
 
   image:
     repository: image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/s2i-minimal-notebook
-    tag: "2025.2"
+    tag: "3.4"
+    gitCommit: "d3137ca"
     pullPolicy: IfNotPresent
+
+  hardwareProfile:
+    name: "default-profile"
+    namespace: "redhat-ods-applications"
 
   resources:
     requests:
-      cpu: "3"
-      memory: "24Gi"
+      cpu: "2"
+      memory: "4Gi"
     limits:
-      cpu: "6"
-      memory: "24Gi"
+      cpu: "4"
+      memory: "8Gi"
 
   storage:
     size: "20Gi"

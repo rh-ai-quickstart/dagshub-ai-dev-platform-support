@@ -10,8 +10,11 @@ metadata:
     opendatahub.io/odh-managed: "true"
     opendatahub.io/user: {{ .Values.workbench.username }}
   annotations:
-    notebooks.opendatahub.io/inject-oauth: "true"
-    notebooks.opendatahub.io/last-size-selection: "Medium"
+    notebooks.opendatahub.io/inject-auth: "true"
+    notebooks.opendatahub.io/last-image-selection: "s2i-minimal-notebook:{{ .Values.workbench.image.tag }}"
+    notebooks.opendatahub.io/last-image-version-git-commit-selection: {{ .Values.workbench.image.gitCommit | quote }}
+    opendatahub.io/hardware-profile-name: {{ .Values.workbench.hardwareProfile.name | quote }}
+    opendatahub.io/hardware-profile-namespace: {{ .Values.workbench.hardwareProfile.namespace | quote }}
     opendatahub.io/username: {{ .Values.workbench.username }}
     opendatahub.io/image-display-name: "Jupyter | Minimal | CPU | Python 3.12"
     openshift.io/display-name: "{{ .Values.workbench.name }}-notebook"
@@ -19,6 +22,48 @@ spec:
   template:
     spec:
       initContainers:
+      {{- if .Values.workbench.gitSync.enabled }}
+      - name: git-clone
+        image: {{ .Values.workbench.gitSync.image }}
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          set -e
+          echo "Starting git clone..."
+
+          clone_repo() {
+            repo=$1; branch=$2; dest=$3; retries=3; count=0
+            until git clone --depth 1 --branch "$branch" "$repo" "$dest"; do
+              count=$((count+1))
+              if [ $count -ge $retries ]; then
+                echo "Failed to clone $repo after $retries attempts, will use ConfigMap fallback"
+                return 1
+              fi
+              echo "Retrying clone... ($count/$retries)"
+              sleep 5
+            done
+          }
+
+          if clone_repo "{{ .Values.workbench.gitSync.docs.repo }}" "{{ .Values.workbench.gitSync.docs.branch }}" /tmp/dagshub-docs && [ -d "/tmp/dagshub-docs/docs" ]; then
+            rm -rf /workspace/docs
+            find /tmp/dagshub-docs -type d -name "assets" -exec rm -rf {} + 2>/dev/null || true
+            cp -rf "/tmp/dagshub-docs/docs" /workspace/
+            find /workspace/docs -type f -exec chmod 644 {} \; 2>/dev/null || true
+            echo "Documentation cloned successfully"
+          fi
+          rm -rf /tmp/dagshub-docs
+
+          if clone_repo "{{ .Values.workbench.gitSync.notebook.repo }}" "{{ .Values.workbench.gitSync.notebook.branch }}" /tmp/notebook-repo && [ -f "/tmp/notebook-repo/deploy/helm/workbench/hello_world_llm.ipynb" ]; then
+            cp "/tmp/notebook-repo/deploy/helm/workbench/hello_world_llm.ipynb" /workspace/hello_world_llm.ipynb
+            chmod 644 /workspace/hello_world_llm.ipynb 2>/dev/null || true
+            echo "Notebook cloned successfully"
+          fi
+          rm -rf /tmp/notebook-repo
+        volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+      {{- end }}
       - name: workspace-setup
         image: {{ .Values.workbench.setupJob.image }}
         command: ["/bin/sh"]
@@ -28,8 +73,6 @@ spec:
           set -e
           echo "Starting workspace setup..."
 
-          {{- if .Values.workbench.gitSync.enabled }}
-          # Use ConfigMap fallbacks if git content is missing
           if [ ! -f /workspace/hello_world_llm.ipynb ] && [ -f /notebook-content/hello_world_llm.ipynb ]; then
             echo "Using notebook ConfigMap fallback..."
             cp /notebook-content/hello_world_llm.ipynb /workspace/hello_world_llm.ipynb
@@ -51,38 +94,6 @@ spec:
               echo "Documentation copied from ConfigMap fallback"
             fi
           fi
-          {{- else }}
-          # Copy notebook from ConfigMap
-          echo "Copying notebook from ConfigMap..."
-          if [ -f /notebook-content/hello_world_llm.ipynb ]; then
-            cp /notebook-content/hello_world_llm.ipynb /workspace/hello_world_llm.ipynb
-            echo "Notebook copied successfully"
-          else
-            echo "ERROR: Notebook not found in ConfigMap"
-            exit 1
-          fi
-
-          # Create docs directory and copy documentation
-          echo "Setting up documentation from ConfigMap..."
-          mkdir -p /workspace/docs
-
-          if [ -d /docs-content ]; then
-            echo "Copying documentation from ConfigMap..."
-            for file in /docs-content/*; do
-              if [ -f "$file" ]; then
-                basename=$(basename "$file")
-                target_path=$(echo "$basename" | sed 's/_/\//g')
-                target_dir=$(dirname "/workspace/$target_path")
-                mkdir -p "$target_dir"
-                cp "$file" "/workspace/$target_path"
-                echo "Copied $basename -> $target_path"
-              fi
-            done
-            echo "Documentation setup complete"
-          else
-            echo "WARNING: Docs ConfigMap not mounted, skipping docs setup"
-          fi
-          {{- end }}
 
           # Create welcome README
           cat > /workspace/README.md << 'EOF'
