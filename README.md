@@ -1,9 +1,6 @@
 # Unify the AI development lifecycle with DagsHub and OpenShift AI
 
-Deploy DagsHub® on Red Hat OpenShift® with Red Hat OpenShift AI® so teams can track experiments, manage datasets, and collaborate on AI projects.
-
-> [!IMPORTANT]  
-> A license and service account from DagsHub are required for this quickstart. See the [prerequisites](#prerequisites) section below for details.
+Track experiments, manage datasets, and collaborate on AI projects on a unified platform with DagsHub&reg; and Red Hat OpenShift AI&reg;.
 
 ## Table of Contents
 
@@ -27,7 +24,7 @@ Deploy DagsHub® on Red Hat OpenShift® with Red Hat OpenShift AI® so teams can
 
 ## Overview
 
-AI teams need a centralized platform to track experiments, manage dataset versions, and collaborate on model development. While cloud-based MLOps solutions exist, many organizations require their AI infrastructure to remain within their private environment to meet security, compliance, and data privacy requirements. This AI quickstart helps teams deploy DagsHub MLOps platform on Red Hat OpenShift AI to track experiments, manage datasets, and collaborate on AI projects.
+AI teams need a centralized platform to track experiments, manage dataset versions, and collaborate on model development. While cloud-based MLOps solutions exist, many organizations require their AI infrastructure to remain within their private environment to meet security, compliance, and data privacy requirements. This AI quickstart helps teams deploy DagsHub MLOps platform on OpenShift AI to track experiments, manage datasets, and collaborate on AI projects.
 
 DagsHub provides a complete MLOps platform with experiment tracking, model registry, and data versioning capabilities that can be deployed entirely within your organization's infrastructure.
 
@@ -39,9 +36,12 @@ Deploying DagsHub with OpenShift AI enables teams to maintain full control over 
 
 ## Requirements
 
+> [!IMPORTANT]  
+> A license and service account from DagsHub are required for this quickstart. See the [prerequisites](#prerequisites) section below for details.
+
 ### Minimum Hardware Requirements
 
-Your OpenShift cluster must have sufficient resources to run DagsHub and its dependencies:
+Your Red Hat OpenShift&reg; cluster must have sufficient resources to run DagsHub and its dependencies:
 
 - **CPU**: 8 vCPUs (minimum 4 vCPUs)
 - **Memory**: 16 GB RAM (minimum 8 GB)
