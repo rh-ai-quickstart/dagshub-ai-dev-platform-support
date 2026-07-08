@@ -242,7 +242,7 @@ oc get events -n <namespace> --sort-by='.lastTimestamp'
 - Verify DNS resolution for your custom domain
 
 ## References
-- [DagsHub documentation](#https://dagshub.com/docs/)
+- [DagsHub documentation](https://dagshub.com/docs/)
 - [Red Hat OpenShift AI documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed)
 - [Red Hat OpenShift documentation](https://docs.redhat.com/en/documentation/openshift_container_platform)
 
