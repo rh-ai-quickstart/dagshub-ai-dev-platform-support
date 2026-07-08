@@ -248,7 +248,10 @@ oc get events -n <namespace> --sort-by='.lastTimestamp'
 
 ## Tags
 
+* **Title:** Unify the AI development lifecycle with DagsHub and OpenShift AI
+* **Description:** Track experiments, manage datasets, and collaborate on AI projects on a unified platform
 * **Industry:** Cross-industry
-* **Product:** Red Hat OpenShift AI
+* **Product:** OpenShift AI
 * **Use Case:** Experiment tracking, managing datasets, and collaborating on AI projects 
 * **Partner**: DagsHub
+* **Contributing org:** Red Hat, DagsHub
