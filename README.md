@@ -8,7 +8,7 @@ Track experiments, manage datasets, and collaborate on AI projects on a unified 
 - [Architecture](#architecture)
 - [Requirements](#requirements)
   - [Minimum Hardware Requirements](#minimum-hardware-requirements)
-  - [Software Requirements](#software-requirements)
+  - [Minimum Software Requirements](#minimum-software-requirements)
 - [Installation](#installation)
   - [Prerequisites](#prerequisites)
   - [Installing the quickstart](#installing-the-quickstart)
@@ -50,7 +50,7 @@ Your Red Hat OpenShift&reg; cluster must have sufficient resources to run DagsHu
 
 **Note**: These are minimum requirements for a small team (5-10 users). For production deployments with larger teams or extensive workloads, scale resources accordingly.
 
-### Software Requirements
+### Minimum Software Requirements
 
 - **Red Hat OpenShift**: Version 4.20 or later
 - **Red Hat OpenShift AI**: Version 3.4 or later
