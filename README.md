@@ -1,6 +1,6 @@
 # Build and evaluate an AI-powered IT support chatbot
 
-Evaluate and track experiments, manage datasets, and collaborate on an IT services chatbot on a unified platform with DagsHub&reg; and Red Hat OpenShift AI&reg;.
+Deploy a RAG-based IT support chatbot, experiment with prompt and model combinations, and track every result to find the best-performing configuration.
 
 ## Table of Contents
 
@@ -26,7 +26,7 @@ Evaluate and track experiments, manage datasets, and collaborate on an IT servic
 
 Enterprise IT service desks face mounting pressure as software portfolios grow and support teams struggle to keep pace with the volume and complexity of user inquiries. Inconsistent answers, long resolution times, and reliance on tribal knowledge lead to poor customer satisfaction and expensive escalation paths. An AI-powered support chatbot built on retrieval-augmented generation (RAG) can address these challenges by grounding its responses in up-to-date documentation, but deploying such a chatbot reliably requires rigorous experimentation. Teams must compare prompt strategies, evaluate proprietary versus open-source models, and measure answer quality with metrics like cosine similarity, BERTScore, and LLM-as-a-judge scoring before promoting a model to production. This quickstart demonstrates that full workflow — from chunking and embedding a knowledge base, to running a prompt-engineering sweep across models, to logging every experiment with MLflow — so that IT organizations can build, evaluate, and continuously improve a documentation chatbot with confidence.
 
-AI teams need a centralized platform to track experiments, manage dataset versions, and collaborate on model development. While cloud-based MLOps solutions exist, many organizations require their AI infrastructure to remain within their private environment to meet security, compliance, and data privacy requirements. This AI quickstart helps teams deploy DagsHub MLOps platform on OpenShift AI to track experiments, manage datasets, and collaborate on AI projects.
+AI teams need a centralized platform to track experiments, manage dataset versions, and collaborate on model development. While cloud-based MLOps solutions exist, many organizations require their AI infrastructure to remain within their private environment to meet security, compliance, and data privacy requirements. This AI quickstart helps teams deploy DagsHub&reg; MLOps platform on Red Hat OpenShift AI&reg; to track experiments, manage datasets, and collaborate on AI projects.
 
 DagsHub provides a complete MLOps platform with experiment tracking, model registry, and data versioning capabilities that can be deployed entirely within your organization's infrastructure. Deploying DagsHub with OpenShift AI enables teams to maintain full control over their AI workflows and data while benefiting from enterprise-grade security and scalability. 
 
