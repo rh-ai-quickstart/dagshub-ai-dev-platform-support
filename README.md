@@ -1,36 +1,36 @@
-# Unify the AI development lifecycle with DagsHub and OpenShift AI
+# Build and evaluate an AI-powered IT support chatbot
 
-Track experiments, manage datasets, and collaborate on AI projects on a unified platform with DagsHub&reg; and Red Hat OpenShift AI&reg;.
+Evaluate and track experiments, manage datasets, and collaborate on an IT services chatbot on a unified platform with DagsHub&reg; and Red Hat OpenShift AI&reg;.
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
+- [Detailed Description](#detailed-description)
+  - [Architecture](#architecture)
 - [Requirements](#requirements)
-  - [Minimum Hardware Requirements](#minimum-hardware-requirements)
-  - [Minimum Software Requirements](#minimum-software-requirements)
-- [Installation](#installation)
+  - [Hardware Requirements](#hardware-requirements)
+  - [Software Requirements](#software-requirements)
+- [Deploy](#deploy)
   - [Prerequisites](#prerequisites)
-  - [Installing the quickstart](#installing-the-quickstart)
-  - [Removing the quickstart](#removing-the-quickstart)
-- [MLflow Workspace Proxy](#mlflow-workspace-proxy)
-- [LLM Tutorial Workbench](#llm-tutorial-workbench)
-- [Management](#management)
+  - [Installation](#installation)
+  - [Delete](#delete)
+- [LLM Guided experience](#llm-guided-experience)
+- [Technical Deep dive](#technical-deep-dive)
+  - [MLflow Workspace Proxy](#mlflow-workspace-proxy)
   - [Check Status](#check-status)
   - [Available Commands](#available-commands)
-- [Troubleshooting](#troubleshooting)
+  - [Troubleshooting](#troubleshooting)
 - [References](#references)
 - [Tags](#tags)
 
-## Overview
+## Detailed Description
+
+Enterprise IT service desks face mounting pressure as software portfolios grow and support teams struggle to keep pace with the volume and complexity of user inquiries. Inconsistent answers, long resolution times, and reliance on tribal knowledge lead to poor customer satisfaction and expensive escalation paths. An AI-powered support chatbot built on retrieval-augmented generation (RAG) can address these challenges by grounding its responses in up-to-date documentation, but deploying such a chatbot reliably requires rigorous experimentation. Teams must compare prompt strategies, evaluate proprietary versus open-source models, and measure answer quality with metrics like cosine similarity, BERTScore, and LLM-as-a-judge scoring before promoting a model to production. This quickstart demonstrates that full workflow — from chunking and embedding a knowledge base, to running a prompt-engineering sweep across models, to logging every experiment with MLflow — so that IT organizations can build, evaluate, and continuously improve a documentation chatbot with confidence.
 
 AI teams need a centralized platform to track experiments, manage dataset versions, and collaborate on model development. While cloud-based MLOps solutions exist, many organizations require their AI infrastructure to remain within their private environment to meet security, compliance, and data privacy requirements. This AI quickstart helps teams deploy DagsHub MLOps platform on OpenShift AI to track experiments, manage datasets, and collaborate on AI projects.
 
-DagsHub provides a complete MLOps platform with experiment tracking, model registry, and data versioning capabilities that can be deployed entirely within your organization's infrastructure.
+DagsHub provides a complete MLOps platform with experiment tracking, model registry, and data versioning capabilities that can be deployed entirely within your organization's infrastructure. Deploying DagsHub with OpenShift AI enables teams to maintain full control over their AI workflows and data while benefiting from enterprise-grade security and scalability. 
 
-Deploying DagsHub with OpenShift AI enables teams to maintain full control over their AI workflows and data while benefiting from enterprise-grade security and scalability. This repository simplifies the deployment process with a single Makefile that automates the installation of DagsHub on your OpenShift AI cluster.
-
-## Architecture
+### Architecture
 
 ![Architecture diagram showing an the integrated stack including OpenShift, OpenShift AI and DagsHub](docs/images/dagshub-openshift-arch.png)
 
@@ -39,7 +39,7 @@ Deploying DagsHub with OpenShift AI enables teams to maintain full control over 
 > [!IMPORTANT]  
 > A license and service account from DagsHub are required for this quickstart. See the [prerequisites](#prerequisites) section below for details.
 
-### Minimum Hardware Requirements
+### Hardware Requirements
 
 Your Red Hat OpenShift&reg; cluster must have sufficient resources to run DagsHub and its dependencies:
 
@@ -50,7 +50,7 @@ Your Red Hat OpenShift&reg; cluster must have sufficient resources to run DagsHu
 
 **Note**: These are minimum requirements for a small team (5-10 users). For production deployments with larger teams or extensive workloads, scale resources accordingly.
 
-### Minimum Software Requirements
+### Software Requirements
 
 - **Red Hat OpenShift**: Version 4.20 or later
 - **Red Hat OpenShift AI**: Version 3.4 or later
@@ -68,7 +68,7 @@ Your Red Hat OpenShift&reg; cluster must have sufficient resources to run DagsHu
   - OpenShift cluster must be able to pull container images from DagsHub's GCP registry (`gcr.io` and `us-docker.pkg.dev`)
   - Ability to expose services via OpenShift routes (for HTTPS access)
 
-## Installation
+## Deploy
 
 ### Prerequisites
 
@@ -78,7 +78,7 @@ Before deploying DagsHub on your OpenShift cluster, you need to obtain a license
 2. **Download the service account JSON file** provided by DagsHub (e.g., `service-account.json`)
 3. **Ensure you have access to your OpenShift cluster** with the required tools installed
 
-### Installing the quickstart
+### Installation
 
 1. **Log in to your OpenShift cluster** and verify admin access:
    ```bash
@@ -126,7 +126,7 @@ Before deploying DagsHub on your OpenShift cluster, you need to obtain a license
 
 7. **Enter your license key** on first access to complete the initial setup
 
-### Removing the quickstart
+### Delete
 
 To remove DagsHub from your OpenShift cluster:
 
@@ -139,27 +139,7 @@ This command will:
 2. Prompt you to delete the container registry secrets (optional)
 3. Prompt you to delete the namespace (optional)
 
-
-## MLflow Workspace Proxy
-
-Red Hat OpenShift AI (RHOAI) 3.4+ ships a built-in MLflow instance that is shared across the cluster. To isolate experiments per namespace, RHOAI requires every API request to carry an `X-MLFLOW-WORKSPACE` header identifying the caller's workspace. DagsHub's MLflow client does not add this header natively, so requests to the built-in MLflow endpoint would be rejected.
-
-The MLflow workspace proxy solves this by sitting between DagsHub and the RHOAI MLflow service. It is a lightweight Nginx (OpenResty) sidecar deployed in the DagsHub namespace that:
-
-1. **Injects the workspace header** every proxied request gets `X-MLFLOW-WORKSPACE` set to the DagsHub namespace, so experiments are scoped correctly.
-2. **Handles authentication** the proxy attaches a bearer token from a dedicated ServiceAccount that has `mlflow-edit`, `mlflow-view`, and `mlflow-integration` RBAC roles.
-3. **Strips unsupported fields** RHOAI rejects `artifact_location` on experiment creation when workspaces are enabled, so the proxy removes it from those requests.
-
-DagsHub is then configured to use `http://mlflow-workspace-proxy.<namespace>.svc:8080` as its MLflow tracking URI instead of calling RHOAI directly.
-
-The proxy is deployed automatically as part of `make install-dagshub`. To check its status or remove it independently:
-
-```bash
-make mlflow-status NAMESPACE=dagshub
-make uninstall-mlflow NAMESPACE=dagshub
-```
-
-## LLM Tutorial Workbench
+## LLM Guided experience
 
 Deploy a pre-configured Jupyter workbench with the DagsHub LLM tutorial to get started with AI development on OpenShift AI:
 
@@ -185,7 +165,25 @@ After deployment, access the workbench through the OpenShift AI dashboard → Da
 
 📖 **For detailed workbench documentation**, see [deploy/helm/workbench/README.md](deploy/helm/workbench/README.md)
 
-## Management
+## Technical Deep dive
+### MLflow Workspace Proxy
+
+Red Hat OpenShift AI (RHOAI) 3.4+ ships a built-in MLflow instance that is shared across the cluster. To isolate experiments per namespace, RHOAI requires every API request to carry an `X-MLFLOW-WORKSPACE` header identifying the caller's workspace. DagsHub's MLflow client does not add this header natively, so requests to the built-in MLflow endpoint would be rejected.
+
+The MLflow workspace proxy solves this by sitting between DagsHub and the RHOAI MLflow service. It is a lightweight Nginx (OpenResty) sidecar deployed in the DagsHub namespace that:
+
+1. **Injects the workspace header** every proxied request gets `X-MLFLOW-WORKSPACE` set to the DagsHub namespace, so experiments are scoped correctly.
+2. **Handles authentication** the proxy attaches a bearer token from a dedicated ServiceAccount that has `mlflow-edit`, `mlflow-view`, and `mlflow-integration` RBAC roles.
+3. **Strips unsupported fields** RHOAI rejects `artifact_location` on experiment creation when workspaces are enabled, so the proxy removes it from those requests.
+
+DagsHub is then configured to use `http://mlflow-workspace-proxy.<namespace>.svc:8080` as its MLflow tracking URI instead of calling RHOAI directly.
+
+The proxy is deployed automatically as part of `make install-dagshub`. To check its status or remove it independently:
+
+```bash
+make mlflow-status NAMESPACE=dagshub
+make uninstall-mlflow NAMESPACE=dagshub
+```
 
 ### Check Status
 
@@ -220,7 +218,7 @@ make delete-secrets NAMESPACE=<namespace>     # Remove secrets only
 make help                                     # Show all options
 ```
 
-## Troubleshooting
+### Troubleshooting
 
 **Pods not starting**:
 ```bash
@@ -248,10 +246,10 @@ oc get events -n <namespace> --sort-by='.lastTimestamp'
 
 ## Tags
 
-* **Title:** Unify the AI development lifecycle with DagsHub and OpenShift AI
+* **Title:** Build and evaluate an AI-powered IT support chatbot
 * **Description:** Track experiments, manage datasets, and collaborate on AI projects on a unified platform
-* **Industry:** Cross-industry
+* **Industry:** Media and IT services
 * **Product:** OpenShift AI
-* **Use Case:** Experiment tracking, managing datasets, and collaborating on AI projects 
+* **Use Case:** Experiment tracking, managing datasets, and collaborating on IT services chatbot
 * **Partner**: DagsHub
 * **Contributing org:** Red Hat, DagsHub
