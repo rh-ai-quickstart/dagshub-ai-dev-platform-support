@@ -93,7 +93,7 @@ Before deploying DagsHub on your OpenShift cluster, you need to obtain a license
 
 2. **Clone this repository**:
    ```bash
-   git clone https://github.com/your-org/dagshub-ai-dev-plaform-support.git
+   git clone https://github.com/rh-ai-quickstart/dagshub-ai-dev-platform-support
    cd dagshub-ai-dev-plaform-support
    ```
 
